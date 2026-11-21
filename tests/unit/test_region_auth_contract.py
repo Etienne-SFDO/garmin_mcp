@@ -37,8 +37,10 @@ def test_mobile_login_consumes_ticket_in_selected_region(region_client, monkeypa
         "responseStatus": {"type": "SUCCESSFUL"},
         "serviceTicketId": "synthetic-service-ticket",
     }
+    session.get.return_value.status_code = 200
     token_post = Mock(return_value=_token_response())
     monkeypatch.setattr(client, "_http_post", token_post)
+    monkeypatch.setattr("garminconnect.client.sso.time.sleep", lambda _s: None)
 
     client._do_mobile_login(session, "test@example.invalid", "unused-test-password")
 
@@ -54,9 +56,15 @@ def test_mobile_login_consumes_ticket_in_selected_region(region_client, monkeypa
     assert token_post.call_args.kwargs["data"]["service_ticket"] == "synthetic-service-ticket"
     assert client.di_token == "synthetic-access-token"
     assert client.di_refresh_token == "synthetic-refresh-token"
-    # A successful DI exchange must not enter the JWT_WEB fallback which
-    # produced the unresolved mobile.integration.garmin.com error for CN.
-    session.get.assert_not_called()
+    # garminconnect>=0.3.20 loads the regional mobile sign-in page once before
+    # the credential POST (cookies + Referer, otherwise Garmin answers 429).
+    # That must be the ONLY GET: a successful DI exchange must not enter the
+    # JWT_WEB fallback which produced the unresolved
+    # mobile.integration.garmin.com error for CN.
+    session.get.assert_called_once()
+    assert session.get.call_args.args[0] == (
+        f"https://sso.{domain}/mobile/sso/en_US/sign-in"
+    )
 
 
 def test_default_ticket_exchange_uses_selected_region(region_client, monkeypatch):

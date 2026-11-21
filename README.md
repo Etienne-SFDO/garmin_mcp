@@ -6,7 +6,7 @@ This Model Context Protocol (MCP) server connects to Garmin Connect and exposes 
 
 Garmin's API is accessed via the awesome [python-garminconnect](https://github.com/cyberjunky/python-garminconnect) library.
 
-Requires **Python 3.12+** and uses **`garminconnect==0.3.19`**. This baseline includes
+Requires **Python 3.12+** and uses **`garminconnect==0.3.20`**. This baseline includes
 the China-region authentication fixes missing from 0.3.2 (see [#257](https://github.com/Taxuspt/garmin_mcp/issues/257)
 and [#345](https://github.com/Taxuspt/garmin_mcp/issues/345)). Upgrade Python before
 updating an existing Python 3.10 or 3.11 installation.
