@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build + deploy garmin-mcp to Cloud Run (read-only tool set).
+# Build + deploy garmin-mcp to Cloud Run (read-only tools + create-only workout tools).
 #
 #   deploy/deploy.sh build    # Cloud Build -> Artifact Registry (tag = git short SHA)
 #   deploy/deploy.sh tokens   # upload ~/.garminconnect/garmin_tokens.json to the bucket
@@ -18,6 +18,13 @@ BUCKET=${PROJECT}-tokens
 SA=garmin-mcp-run@${PROJECT}.iam.gserviceaccount.com
 SECRET=garmin-mcp-http-token
 TAG=$(git rev-parse --short HEAD)
+# Write tools enabled on top of the read-only set. Create-only workout tools:
+# Claude can design, schedule and push workouts but cannot delete, unschedule
+# or modify anything existing. Set READ_ONLY=1 to deploy read-only.
+WRITE_TOOLS="create_run_workout,create_run_interval_workout,create_strength_workout,\
+create_walk_run_workout,create_z2_walk_workout,upload_workout,upload_workouts,\
+schedule_workout,schedule_workouts,schedule_week,push_workout_to_device"
+[[ "${READ_ONLY:-0}" == 1 ]] && WRITE_TOOLS=""
 IMAGE=${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/${SERVICE}:${TAG}
 cd "$(dirname "$0")/.."
 
@@ -35,10 +42,17 @@ tokens() {
 }
 
 deploy() {
-  # Read-only: allowlist exactly the tools annotated READ_ONLY in the repo.
+  # Allowlist = every tool annotated READ_ONLY + $WRITE_TOOLS, which must all be
+  # ADDITIVE (create-only) tools - a typo or a destructive tool aborts the deploy.
   local tools
-  tools=$(uv run python -I -c "import sys; sys.path.insert(0,'src'); \
-from garmin_mcp.tool_annotations import READ_ONLY_TOOLS as R; print(','.join(sorted(R)))" 2>/dev/null)
+  tools=$(WRITE_TOOLS="$WRITE_TOOLS" uv run python -I -c "
+import os, sys; sys.path.insert(0, 'src')
+from garmin_mcp.tool_annotations import READ_ONLY_TOOLS as R, ADDITIVE_TOOLS as A
+w = {t for t in os.environ['WRITE_TOOLS'].split(',') if t}
+bad = w - A
+if bad: sys.exit(f'not create-only tools: {sorted(bad)}')
+print(','.join(sorted(R | w)))" 2>/dev/null) || { echo "Bad WRITE_TOOLS list" >&2; exit 1; }
+  echo "Enabling $(tr ',' '\n' <<<"$tools" | wc -l | tr -d ' ') tools (write: ${WRITE_TOOLS:-none})"
   local envfile; envfile=$(mktemp)
   cat > "$envfile" <<EOF
 GARMIN_MCP_TRANSPORT: streamable-http
