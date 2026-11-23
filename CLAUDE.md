@@ -1,5 +1,20 @@
 # Garmin MCP Server - Project Guide
 
+## ⚠️ This fork: personal Cloud Run deployment — read first
+
+This fork (branch `gcp-deploy`) runs the server on Google Cloud Run as a
+claude.ai custom connector for one person's Garmin account.
+**Before doing anything operational — fixing a broken connector, re-logging in
+to Garmin, deploying, changing tools, merging upstream — read
+[deploy/RUNBOOK.md](deploy/RUNBOOK.md) in full.**
+
+Non-negotiable: never run `garmin-mcp-auth` or a credential `login()` against
+Garmin (it triggers 24h+ rate limits). Re-login only via
+`deploy/one_shot_login.py` browser mode, and never loop retries. Never commit
+tokens, the bearer secret, the service URL or personal details — this fork is public.
+
+The rest of this file is the upstream developer guide.
+
 ## Overview
 
 This is a Model Context Protocol (MCP) server that connects to Garmin Connect and exposes fitness and health data to Claude and other MCP-compatible clients. The server provides 122 tools organized into 15 functional modules.

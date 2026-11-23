@@ -23,3 +23,7 @@ playground/*
 scratch/*
 tests/fixtures/captured/*
 !tests/fixtures/captured/poc_walk_run.json
+
+# Garmin tokens / rescue files (never commit)
+garmin_tokens*.json
+*.RESCUE.json
