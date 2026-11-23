@@ -77,7 +77,12 @@ TICKET_PATTERNS = (
     re.compile(r"\"serviceTicketId\"\s*:\s*\"(ST-[^\"]+)\""),
     re.compile(r"(?<![A-Za-z0-9])(ST-[A-Za-z0-9-]+)"),
 )
-BLOCK_PATTERN = "*ticket=ST-*"
+# Chrome's Request conditions panel takes URLPattern syntax; block the whole
+# redirect host(s) so the ticket-carrying navigation never leaves the browser.
+BLOCK_PATTERNS = {
+    "ios": "*://mobile.integration.garmin.com/*",
+    "embed": "*://sso.garmin.com/sso/embed*",
+}
 MFA_TRIES = 3  # re-entering a mistyped code reuses the same SSO session
 
 
@@ -97,10 +102,12 @@ def browser_mode(c, service_key: str) -> None:
 BEFORE signing in - set up Chrome so the ticket is not used up:
   a. Open a new Chrome window (Incognito is fine) on a blank tab.
   b. Open DevTools (Cmd+Opt+I) > Network tab. Tick "Preserve log".
-  c. Cmd+Shift+P > type "Show Network request blocking" > Enter.
-     Tick "Enable network request blocking", click "+", enter:
-         {BLOCK_PATTERN}
-     and click Add.
+  c. Cmd+Shift+P > type "request conditions" > Enter (older Chrome:
+     "Show Network request blocking"). Tick "Enable blocking and throttling",
+     click "+", enter exactly:
+         {BLOCK_PATTERNS[service_key]}
+     set it to Block, click elsewhere, and check it has NO red outline
+     (red = "failed to parse" = not blocking).
   d. Leave DevTools open on that tab.
 
 THEN:
@@ -109,19 +116,30 @@ THEN:
      {url}
 
   2. Sign in and enter the emailed MFA code.
-  3. The final redirect will show as BLOCKED (red) in the Network list, and
-     the page may say the request was blocked. That is what we want.
-     Click the blocked request (name starts with 'ios?ticket=' or
-     'embed?ticket=') > Headers > copy the full Request URL.
-     (Or copy the address bar if it shows ticket=ST-...)
-     Fallback: click the 'login' / 'verifyCode' request > Response and copy
-     the serviceTicketId value.
+  3. FASTEST: as soon as the code is accepted, type verifyCode in the Network
+     filter box, click that request > Response, copy the serviceTicketId
+     value (ST-...). (No MFA prompt? use the 'login' request instead.)
+     The blocked redirect also shows red ('... affected' goes to 1) and its
+     Request URL contains the same ticket.
 """)
     raw = input("  4. Paste the URL or ticket here (promptly - it expires): ")
     ticket = extract_ticket(raw)
     if not ticket:
         raise SystemExit("No ST-... ticket found in what you pasted. Nothing sent.")
     print(f"Exchanging ticket {ticket[:10]}... for DI OAuth tokens...")
+    # The library only logs the HTTP status at DEBUG; show status + error body
+    # for failed attempts (failure bodies carry no tokens) so a rejection is
+    # diagnosable without another login.
+    orig = c._di_token_post
+
+    def traced(client_id, accept, data):
+        r = orig(client_id, accept, data)
+        if not r.ok:
+            body = (r.text or "").replace("\n", " ")[:300]
+            print(f"  diauth {client_id}: HTTP {r.status_code} {body}")
+        return r
+
+    c._di_token_post = traced
     c._exchange_service_ticket(ticket, service_url=service_url)
 
 
