@@ -13,6 +13,15 @@ Garmin (it triggers 24h+ rate limits). Re-login only via
 `deploy/one_shot_login.py` browser mode, and never loop retries. Never commit
 tokens, the bearer secret, the service URL or personal details — this fork is public.
 
+### When something breaks
+
+The owner will typically say: *"Read deploy/RUNBOOK.md in Etienne-SFDO/garmin_mcp
+(branch gcp-deploy). My Garmin connector stopped working — triage it."*
+Then: follow RUNBOOK section 3 (Triage) — check `gcloud` auth, `/readyz`, and the
+Cloud Run logs **before** changing anything; pick the fix from the symptom table;
+only re-login (section 5) if the tokens are actually dead, and the owner must run
+that step themselves in Terminal (interactive browser + MFA).
+
 The rest of this file is the upstream developer guide.
 
 ## Overview

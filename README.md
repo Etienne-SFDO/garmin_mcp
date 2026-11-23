@@ -1,5 +1,25 @@
 [![MseeP.ai Security Assessment Badge](https://mseep.net/pr/taxuspt-garmin-mcp-badge.png)](https://mseep.ai/app/taxuspt-garmin-mcp)
 
+> ## 🛠️ This fork: personal Cloud Run deployment — when something breaks
+>
+> This fork (default branch `gcp-deploy`) runs the server on Google Cloud Run as a
+> claude.ai custom connector. Everything about it is in
+> **[deploy/RUNBOOK.md](deploy/RUNBOOK.md)**.
+>
+> **If the Garmin connector stops working:** open **Claude Code** (it needs to run
+> `gcloud`; Claude on web/mobile can only read) in a clone of this repo and say:
+>
+> ```text
+> Read deploy/RUNBOOK.md in Etienne-SFDO/garmin_mcp (branch gcp-deploy).
+> My Garmin connector stopped working — triage it.
+> ```
+>
+> Quick self-check: `curl -s "$(gcloud run services describe garmin-mcp --region europe-west2 --format='value(status.url)')/readyz"`
+> → `{"status":"ready"}` means the server is up and signed in to Garmin.
+>
+> ⚠️ Never run `garmin-mcp-auth` or retry Garmin logins in a loop (24h+ rate limits).
+> Re-login only via `deploy/one_shot_login.py` (browser mode) — see the runbook.
+
 # Garmin MCP Server
 
 This Model Context Protocol (MCP) server connects to Garmin Connect and exposes your fitness and health data to Claude and other MCP-compatible clients.
